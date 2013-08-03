@@ -1,15 +1,33 @@
 <?php
 
-$latitude = 43.08;//$argv[1];
-$longitude = -79.08;//$argv[2];
-// $distance = isset($argv[3]) ? $argv[3] : 10;
+if (count($argv) == 1) {
+	echo "usage: latitude longitude distance min_zoom max_zoom map_directory\n";
+	exit;
+}
 
-$distance = 1000;
+$LATITUDE = $argv[1];
+$LONGITUDE = $argv[2];
+$DISTANCE = isset($argv[3]) ? $argv[3] : 1;
+$MIN_ZOOM = isset($argv[4]) ? $argv[4] : 0;
+$MAX_ZOOM = isset($argv[5]) ? $argv[5] : 18;
+$MAP_DIR = isset($argv[6]) ? $argv[6] : "map/";
 
-$MIN_ZOOM = 10;
-$MAX_ZOOM = 14;
-
-$MAP_DIR = "map/";
+if ($LATITUDE > 90 || $LATITUDE < -90) {
+	echo "Latitude must be between 90 and -90.\n";
+	exit;
+} else if ($LONGITUDE > 180 || $LONGITUDE < -180) {
+	echo "Longitude must be between 90 and -90.\n";
+	exit;
+} else if ($DISTANCE < 0) {
+	echo "Distance must be greater than 0.\n";
+	exit;
+} else if ($MIN_ZOOM < 0) {
+	echo "Minimum zoom must be greater than 0.\n";
+	exit;
+} else if ($MIN_ZOOM > $MAX_ZOOM) {
+	echo "Maximum zoom must be greater than minimum zoom.\n";
+	exit;
+}
 
 if (!is_dir($MAP_DIR)) {
 	mkdir($MAP_DIR);
@@ -25,29 +43,20 @@ function getY($lat, $zoom) {
 
 function newLongitudeLatitude($initial_longitude, $initial_latitude, $distance, $bearing) {
 	
-	$bearing *= 0.0174532925;
-	
-	// $EARTH_RADIUS_M = 6378.137;
-	// $d_R = $distance / $EARTH_RADIUS_M;
-	// $new_latitude = $initial_latitude + asin( sin($initial_latitude) * cos($d_R) + cos($initial_latitude) * sin($d_R) * cos($bearing) );
-	// $new_longitude = $initial_longitude + atan2( sin($bearing) * sin($d_R) * cos($initial_latitude), cos($d_R) - sin($initial_latitude) * sin($new_latitude));
-	
+	$bearing = deg2rad($bearing);
+	$EARTH_RADIUS_M = 6378.137;
+	$d_R = $distance / $EARTH_RADIUS_M;
 
-	$dx = $distance * sin($bearing);
-	$dy = $distance * cos($bearing);
-	$d_longitude = $dx / ( 111320 * cos($initial_latitude) );
-	$d_latitude = $dy / 110540;
-	$new_longitude = $initial_longitude + $d_longitude;
-	$new_latitude = $initial_latitude + $d_latitude;
+	$initial_latitude = deg2rad($initial_latitude);
+	$initial_longitude = deg2rad($initial_longitude);
 
-	// print_r(array(
-	// 	'longitude' => $new_longitude,
-	// 	'latitude' => $new_latitude,
-	// ));
+	$new_latitude = asin( sin($initial_latitude) * cos($d_R) + cos($initial_latitude) * sin($d_R) * cos($bearing) );
+
+	$new_longitude = $initial_longitude + atan2( sin($bearing) * sin($d_R) * cos($initial_latitude), cos($d_R) - sin($initial_latitude) * sin($new_latitude));
 
 	return array(
-		'longitude' => $new_longitude,
-		'latitude' => $new_latitude,
+		'longitude' => rad2deg($new_longitude),
+		'latitude' => rad2deg($new_latitude),
 	);
 }
 
@@ -55,21 +64,10 @@ function newLongitudeLatitude($initial_longitude, $initial_latitude, $distance, 
 // Longitude = X
 // Latitude = Y
 
-$north_lonlat = newLongitudeLatitude($longitude, $latitude, $distance, 0);
-$south_lonlat = newLongitudeLatitude($longitude, $latitude, $distance, 180);
-$east_lonlat = newLongitudeLatitude($longitude, $latitude, $distance, 90);
-$west_lonlat = newLongitudeLatitude($longitude, $latitude, $distance, 270);
-
-// echo $north_lonlat['latitude']. "," . $north_lonlat['longitude'] ."\n";
-// echo $south_lonlat['latitude']. "," . $south_lonlat['longitude'] ."\n";
-// echo $east_lonlat['latitude']. "," . $east_lonlat['longitude'] ."\n";
-// echo $west_lonlat['latitude']. "," . $west_lonlat['longitude'] ."\n";
-
-// print_r($north_lonlat);
-// print_r($south_lonlat);
-// print_r($east_lonlat);
-// print_r($west_lonlat);
-// die;
+$north_lonlat = newLongitudeLatitude($LONGITUDE, $LATITUDE, $DISTANCE, 0);
+$south_lonlat = newLongitudeLatitude($LONGITUDE, $LATITUDE, $DISTANCE, 180);
+$east_lonlat = newLongitudeLatitude($LONGITUDE, $LATITUDE, $DISTANCE, 90);
+$west_lonlat = newLongitudeLatitude($LONGITUDE, $LATITUDE, $DISTANCE, 270);
 
 $min_longitude = $west_lonlat['longitude'];
 $max_longitude = $east_lonlat['longitude'];
@@ -77,26 +75,20 @@ $max_longitude = $east_lonlat['longitude'];
 $min_latitude = $south_lonlat['latitude'];
 $max_latitude = $north_lonlat['latitude'];
 
-// echo $max_longitude . "\n";
-// echo $min_longitude . "\n";
-// echo $max_latitude . "\n";
-// echo $min_latitude . "\n";
-
 for ($zoom = $MIN_ZOOM; $zoom <= $MAX_ZOOM; ++$zoom) {
 
 	if (!is_dir($MAP_DIR.$zoom)) {
 		mkdir($MAP_DIR.$zoom);
 	}
 
-	$max_x = getX($min_longitude, $zoom) + 1;
-	$min_x = getX($max_longitude, $zoom) - 1;
+	$min_x = getX($min_longitude, $zoom);
+	$max_x = getX($max_longitude, $zoom);
 
-	$max_y = getY($min_latitude, $zoom) + 1;
-	$min_y = getY($max_latitude, $zoom) - 1;
+	$max_y = getY($min_latitude, $zoom);
+	$min_y = getY($max_latitude, $zoom);
 
 	$x_array = array();
 	$y_array = array();
-
 
 	for ($i = $min_x; $i <= $max_x; $i++) { 
 		$x_array[] = $i;
