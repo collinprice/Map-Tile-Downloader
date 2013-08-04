@@ -10,4 +10,5 @@ Usage:
 
 * Required: longitude latitude
 * Distance in Kilometers
-* Minimun zoom: 0
+* Minimum zoom: 0
+* Default zoom: 0 - 18
